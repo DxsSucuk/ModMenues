@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Reflection;
+using HarmonyLib;
 using Lv1;
+using Steamworks;
 using UnityEngine;
 using UnityModManagerNet;
 
@@ -8,11 +10,27 @@ namespace MirrorModMenu
 {
     public class Main
     {
+        static bool unlockDLC;
+        private static UnityModManager.ModEntry modInstance;
+        
         /*
          * This function will load the Mod into the Unity Mod Manager. 
          */
         static bool Load(UnityModManager.ModEntry modEntry)
         {
+            try
+            {
+                var harmony = new Harmony(modEntry.Info.Id);
+                harmony.PatchAll();
+            }
+            catch (Exception ex)
+            {
+                modEntry.Logger.LogException(ex);
+                modEntry.Logger.Log(ex.HelpLink);
+                modEntry.Logger.Log(ex.StackTrace);
+                modEntry.Logger.Log(ex.Message);
+            }
+            modInstance = modEntry;
             modEntry.Logger.Log("Injected Mod Menu.");
             modEntry.OnGUI = OnGUI;
             return true;
@@ -97,6 +115,14 @@ namespace MirrorModMenu
             }
             
             /*
+             * Unlocks DLC
+            */
+            if (GUILayout.Button("Unlock DLC"))
+            {
+                unlockDLC = true;
+            }
+
+            /*
              * Sets the Turns variable to 0.
              * Reflection was used since the Turns var is private.
             */
@@ -172,5 +198,30 @@ namespace MirrorModMenu
                 
             }
         }
+        
+        /*
+         * Harmony Patcher for unlocking DLC
+         */
+        [HarmonyPatch(typeof(SteamApps), "BIsDlcInstalled")]
+        class SteamApps_BIsDlcInstalled_Patch
+        {
+            static void Postfix(ref bool __result)
+            {
+                if (!unlockDLC)
+                    return;
+                try
+                {
+                    __result = true;
+                }
+                catch(Exception e)
+                {
+                    modInstance.Logger.Error(e.ToString());
+                }
+            }
+        }
     }
+    
+    
+    
+    
 }
